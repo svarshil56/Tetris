@@ -1,0 +1,15 @@
+Things needed for tetris
+1.Map
+2.Animation
+3.Shape
+4.Movement right ,left ,down and rotate
+5.Collision detection
+6.No Overlapping
+7.Points for each points
+8.Points for each line clear
+9.Row destroy and shifting
+10.File for highscore
+11.Dificulty
+12.Direction
+13.Levels
+14.Rotate shape via circular ll
