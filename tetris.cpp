@@ -9,17 +9,21 @@
 #include <fstream>
 using namespace std;
 
-const int scrWidth = 50; // Console Screen Size X (columns)
+const int scrWidth = 50;  // Console Screen Size X (columns)
 const int scrHeight = 40; // Console Screen Size Y (rows)
-const int fldWidth = 20; // Field Width
+const int fldWidth = 20;  // Field Width
 const int fldHeight = 30; // Field Height
 
-enum GameMode { DEFAULT, RANDOM };
+enum GameMode
+{
+    DEFAULT,
+    RANDOM
+};
 
-class TetrisGame 
+class TetrisGame
 {
 public:
-    TetrisGame(GameMode mode) : mode(mode), curPiece(0), curRot(0), curX(fldWidth / 2), curY(0), spd(20), spdCount(0), forceDown(false), rotHold(true), pieceCount(0), score(0), gameOver(false), paused(false), level(1), highScore(0) 
+    TetrisGame(GameMode mode) : mode(mode), curPiece(0), curRot(0), curX(fldWidth / 2), curY(0), spd(20), spdCount(0), forceDown(false), rotHold(true), pieceCount(0), score(0), gameOver(false), paused(false), level(1), highScore(0), instantDrop(false)
     {
         srand(time(0));
         initializeField();
@@ -28,20 +32,20 @@ public:
         loadHighScore();
     }
 
-    ~TetrisGame() 
+    ~TetrisGame()
     {
         delete[] field;
         delete[] screen;
         saveHighScore();
     }
 
-    void run() 
+    void run()
     {
         showStartingAnimation();
         setTerminalRawMode(true);
-        while (!gameOver) 
+        while (!gameOver)
         {
-            if (!paused) 
+            if (!paused)
             {
                 this_thread::sleep_for(chrono::milliseconds(50)); // Small Step = 1 Game Tick
                 spdCount++;
@@ -53,8 +57,8 @@ public:
 
                 // Reset input keys
                 fill(begin(key), end(key), false);
-            } 
-            else 
+            }
+            else
             {
                 handleInput();
             }
@@ -84,8 +88,9 @@ private:
     bool paused;
     int level;
     int highScore;
+    bool instantDrop;
 
-    void initializeField() 
+    void initializeField()
     {
         field = new unsigned char[fldWidth * fldHeight];
         for (int x = 0; x < fldWidth; x++)
@@ -93,7 +98,7 @@ private:
                 field[y * fldWidth + x] = (x == 0 || x == fldWidth - 1 || y == fldHeight - 1) ? 9 : 0;
     }
 
-    void initializePieces() 
+    void initializePieces()
     {
         pieces[0].append(L"..X...X...X...X."); // Tetronimos 4x4
         pieces[1].append(L"..X..XX...X.....");
@@ -104,29 +109,30 @@ private:
         pieces[6].append(L"..X...X..XX.....");
     }
 
-    void initializeScreen() 
+    void initializeScreen()
     {
         screen = new wchar_t[scrWidth * scrHeight];
-        for (int i = 0; i < scrWidth * scrHeight; i++) screen[i] = L' ';
+        for (int i = 0; i < scrWidth * scrHeight; i++)
+            screen[i] = L' ';
     }
 
-    void loadHighScore() 
+    void loadHighScore()
     {
         ifstream file("highscore.txt");
-        if (file.is_open()) 
+        if (file.is_open())
         {
             file >> highScore;
             file.close();
         }
     }
 
-    void saveHighScore() 
+    void saveHighScore()
     {
-        if (score > highScore) 
+        if (score > highScore)
         {
             highScore = score;
             ofstream file("highscore.txt");
-            if (file.is_open()) 
+            if (file.is_open())
             {
                 file << highScore;
                 file.close();
@@ -134,22 +140,22 @@ private:
         }
     }
 
-    void showStartingAnimation() 
+    void showStartingAnimation()
     {
         system("clear");
         string text = "TETRIS GAME";
         string displayText = "           ";
-        for (int i = 0; i < 11; ++i) 
+        for (int i = 0; i < 11; ++i)
         {
             displayText[i] = text[i];
             system("clear");
-            for (int j = 0; j < 10; ++j) 
+            for (int j = 0; j < 10; ++j)
             {
-                if (j == 2) 
+                if (j == 2)
                 {
                     cout << displayText;
-                } 
-                else 
+                }
+                else
                 {
                     cout << "     ";
                 }
@@ -159,29 +165,37 @@ private:
         }
     }
 
-    int rotate(int px, int py, int r) 
+    int rotate(int px, int py, int r)
     {
         int pi = 0;
-        switch (r % 4) 
+        switch (r % 4)
         {
-            case 0: pi = py * 4 + px; break; // 0 degrees
-            case 1: pi = 12 + py - (px * 4); break; // 90 degrees
-            case 2: pi = 15 - (py * 4) - px; break; // 180 degrees
-            case 3: pi = 3 - py + (px * 4); break; // 270 degrees
+        case 0:
+            pi = py * 4 + px;
+            break; // 0 degrees
+        case 1:
+            pi = 12 + py - (px * 4);
+            break; // 90 degrees
+        case 2:
+            pi = 15 - (py * 4) - px;
+            break; // 180 degrees
+        case 3:
+            pi = 3 - py + (px * 4);
+            break; // 270 degrees
         }
         return pi;
     }
 
-    bool doesPieceFit(int pieceIdx, int rot, int posX, int posY) 
+    bool doesPieceFit(int pieceIdx, int rot, int posX, int posY)
     {
         for (int px = 0; px < 4; px++)
-            for (int py = 0; py < 4; py++) 
+            for (int py = 0; py < 4; py++)
             {
                 int pi = rotate(px, py, rot);
                 int fi = (posY + py) * fldWidth + (posX + px);
-                if (posX + px >= 0 && posX + px < fldWidth) 
+                if (posX + px >= 0 && posX + px < fldWidth)
                 {
-                    if (posY + py >= 0 && posY + py < fldHeight) 
+                    if (posY + py >= 0 && posY + py < fldHeight)
                     {
                         if (pieces[pieceIdx][pi] != L'.' && field[fi] != 0)
                             return false;
@@ -191,7 +205,7 @@ private:
         return true;
     }
 
-    bool kbhit() 
+    bool kbhit()
     {
         struct timeval tv = {0L, 0L};
         fd_set fds;
@@ -200,52 +214,70 @@ private:
         return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
     }
 
-    char getch() 
+    char getch()
     {
         char buf = 0;
-        if (read(STDIN_FILENO, &buf, 1) < 0) 
+        if (read(STDIN_FILENO, &buf, 1) < 0)
         {
             perror("read()");
         }
         return buf;
     }
 
-    void setTerminalRawMode(bool enable) 
+    void setTerminalRawMode(bool enable)
     {
         static struct termios oldt, newt;
-        if (enable) 
+        if (enable)
         {
             tcgetattr(STDIN_FILENO, &oldt);
             newt = oldt;
             newt.c_lflag &= static_cast<tcflag_t>(~(ICANON | ECHO));
             tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-        } 
+        }
         else
         {
             tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
         }
     }
 
-    void handleInput() 
+    void handleInput()
     {
-        if (kbhit()) 
+        if (kbhit())
         {
             char keyPressed = getch();
-            switch (keyPressed) 
+            switch (keyPressed)
             {
-                case 'd': key[0] = true; break; // Move right
-                case 'a': key[1] = true; break; // Move left
-                case 's': key[2] = true; break; // Move down
-                case 'w': key[3] = true; break; // Rotate
-                case 'x': gameOver = true; break; // Exit
-                case 'r': initialize(); break; // Restart
-                case 'p': paused = !paused; break; // Pause
-                default: break;
+            case 'd':
+                key[0] = true;
+                break; // Move right
+            case 'a':
+                key[1] = true;
+                break; // Move left
+            case 's':
+                key[2] = true;
+                break; // Move down
+            case 'w':
+                key[3] = true;
+                break; // Rotate
+            case ' ':
+                instantDrop = true;
+                break; // Instant drop
+            case 'x':
+                gameOver = true;
+                break; // Exit
+            case 'r':
+                initialize();
+                break; // Restart
+            case 'p':
+                paused = !paused;
+                break; // Pause
+            default:
+                break;
             }
         }
     }
 
-    void initialize() 
+    void initialize()
     {
         curPiece = 0;
         curRot = 0;
@@ -264,35 +296,47 @@ private:
         initializeField();
     }
 
-    void updateGame() 
+    void updateGame()
     {
         curX += (key[0] && doesPieceFit(curPiece, curRot, curX + 1, curY)) ? 1 : 0;
         curX -= (key[1] && doesPieceFit(curPiece, curRot, curX - 1, curY)) ? 1 : 0;
         curY += (key[2] && doesPieceFit(curPiece, curRot, curX, curY + 1)) ? 1 : 0;
 
-        if (key[3]) 
+        if (key[3])
         {
             curRot += (rotHold && doesPieceFit(curPiece, curRot + 1, curX, curY)) ? 1 : 0;
             rotHold = false;
-        } 
+        }
         else
             rotHold = true;
 
-        if (forceDown) 
+        // Instant drop logic
+        if (instantDrop)
+        {
+            while (doesPieceFit(curPiece, curRot, curX, curY + 1))
+            {
+                curY++;
+            }
+            instantDrop = false;
+            forceDown = true; // Force placing the piece
+        }
+
+        if (forceDown)
         {
             spdCount = 0;
             pieceCount++;
             if (pieceCount % 50 == 0)
-                if (spd >= 10) spd--;
+                if (spd >= 10)
+                    spd--;
 
-            if (mode == RANDOM) // 100% chance to change piece
+            if (mode == RANDOM)
             {
                 curPiece = rand() % 7;
             }
 
             if (doesPieceFit(curPiece, curRot, curX, curY + 1))
                 curY++;
-            else 
+            else
             {
                 for (int px = 0; px < 4; px++)
                     for (int py = 0; py < 4; py++)
@@ -300,13 +344,13 @@ private:
                             field[(curY + py) * fldWidth + (curX + px)] = curPiece + 1;
 
                 for (int py = 0; py < 4; py++)
-                    if (curY + py < fldHeight - 1) 
+                    if (curY + py < fldHeight - 1)
                     {
                         bool line = true;
                         for (int px = 1; px < fldWidth - 1; px++)
                             line &= (field[(curY + py) * fldWidth + px]) != 0;
 
-                        if (line) 
+                        if (line)
                         {
                             for (int px = 1; px < fldWidth - 1; px++)
                                 field[(curY + py) * fldWidth + px] = 8;
@@ -315,8 +359,8 @@ private:
                     }
 
                 score += 25;
-                if (!lines.empty()) 
-                score += (1 << lines.size()) * 100;
+                if (!lines.empty())
+                    score += (1 << lines.size()) * 100;
 
                 curX = fldWidth / 2;
                 curY = 0;
@@ -325,8 +369,7 @@ private:
 
                 gameOver = !doesPieceFit(curPiece, curRot, curX, curY);
 
-                // Increase level and speed
-                if (score / 1000 > level - 1) 
+                if (score / 1000 > level - 1)
                 {
                     level++;
                     spd = max(10, spd - 2);
@@ -335,7 +378,7 @@ private:
         }
     }
 
-    void drawGame() 
+    void drawGame()
     {
         system("clear");
 
@@ -348,15 +391,16 @@ private:
                 if (pieces[curPiece][rotate(px, py, curRot)] != L'.')
                     screen[(curY + py + 2) * scrWidth + (curX + px + 2)] = curPiece + 65;
 
-        for (int i = 0; i < scrHeight; i++) {
-            for (int j = 0; j < scrWidth; j++) 
+        for (int i = 0; i < scrHeight; i++)
+        {
+            for (int j = 0; j < scrWidth; j++)
             {
                 wcout << screen[i * scrWidth + j];
             }
             wcout << endl;
         }
 
-        if (!lines.empty()) 
+        if (!lines.empty())
         {
             this_thread::sleep_for(chrono::milliseconds(400));
 
@@ -380,7 +424,7 @@ private:
     }
 };
 
-int main() 
+int main()
 {
     int modeChoice;
     cout << "Select Game Mode: 1. Default 2. Random Pieces" << endl;
