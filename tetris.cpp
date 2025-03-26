@@ -7,23 +7,20 @@
 #include <thread>
 #include <chrono>
 #include <fstream>
+#include <cstring> // Include this header for memcpy
 using namespace std;
 
-const int scrWidth = 50;  // Console Screen Size X (columns)
-const int scrHeight = 40; // Console Screen Size Y (rows)
-const int fldWidth = 20;  // Field Width
-const int fldHeight = 30; // Field Height
+const int consoleWidth = 50; // Console Screen Size X (columns)
+const int consoleHeight = 40; // Console Screen Size Y (rows)
+const int fieldWidth = 20; // Field Width
+const int fieldHeight = 30; // Field Height
 
-enum GameMode
-{
-    DEFAULT,
-    RANDOM
-};
+enum GameMode { DEFAULT, RANDOM };
 
-class TetrisGame
+class TetrisGame 
 {
 public:
-    TetrisGame(GameMode mode) : mode(mode), curPiece(0), curRot(0), curX(fldWidth / 2), curY(0), spd(20), spdCount(0), forceDown(false), rotHold(true), pieceCount(0), score(0), gameOver(false), paused(false), level(1), highScore(0), instantDrop(false)
+    TetrisGame(GameMode gameMode) : gameMode(gameMode), currentPiece(0), currentRotation(0), currentX(fieldWidth / 2), currentY(0), speed(20), speedCounter(0), forcePieceDown(false), rotationHold(true), pieceCounter(0), score(0), isGameOver(false), isPaused(false), level(1), highScore(0), nextPiece(rand() % 7), previousField(nullptr), previousPiece(-1), previousRotation(0), previousX(0), previousY(0), previousScore(0) 
     {
         srand(time(0));
         initializeField();
@@ -32,33 +29,34 @@ public:
         loadHighScore();
     }
 
-    ~TetrisGame()
+    ~TetrisGame() 
     {
         delete[] field;
         delete[] screen;
+        delete[] previousField;
         saveHighScore();
     }
 
-    void run()
+    void run() 
     {
         showStartingAnimation();
         setTerminalRawMode(true);
-        while (!gameOver)
+        while (!isGameOver) 
         {
-            if (!paused)
+            if (!isPaused) 
             {
                 this_thread::sleep_for(chrono::milliseconds(50)); // Small Step = 1 Game Tick
-                spdCount++;
-                forceDown = (spdCount == spd);
+                speedCounter++;
+                forcePieceDown = (speedCounter == speed);
 
                 handleInput();
                 updateGame();
                 drawGame();
 
                 // Reset input keys
-                fill(begin(key), end(key), false);
-            }
-            else
+                fill(begin(keys), end(keys), false);
+            } 
+            else 
             {
                 handleInput();
             }
@@ -68,71 +66,78 @@ public:
     }
 
 private:
-    GameMode mode;
-    wstring pieces[7];
+    GameMode gameMode;
+    wstring tetrominoes[7];
     unsigned char *field;
     wchar_t *screen;
-    bool key[4] = {false, false, false, false};
-    int curPiece;
-    int curRot;
-    int curX;
-    int curY;
-    int spd;
-    int spdCount;
-    bool forceDown;
-    bool rotHold;
-    int pieceCount;
+    bool keys[4] = {false, false, false, false};
+    int currentPiece;
+    int currentRotation;
+    int currentX;
+    int currentY;
+    int speed;
+    int speedCounter;
+    bool forcePieceDown;
+    bool rotationHold;
+    int pieceCounter;
     int score;
-    vector<int> lines;
-    bool gameOver;
-    bool paused;
+    vector<int> completedLines;
+    bool isGameOver;
+    bool isPaused;
     int level;
     int highScore;
-    bool instantDrop;
+    int nextPiece;
 
-    void initializeField()
+    // Variables for undo functionality
+    unsigned char *previousField;
+    int previousPiece;
+    int previousRotation;
+    int previousX;
+    int previousY;
+    int previousScore;
+
+    void initializeField() 
     {
-        field = new unsigned char[fldWidth * fldHeight];
-        for (int x = 0; x < fldWidth; x++)
-            for (int y = 0; y < fldHeight; y++)
-                field[y * fldWidth + x] = (x == 0 || x == fldWidth - 1 || y == fldHeight - 1) ? 9 : 0;
+        field = new unsigned char[fieldWidth * fieldHeight];
+        for (int x = 0; x < fieldWidth; x++)
+            for (int y = 0; y < fieldHeight; y++)
+                field[y * fieldWidth + x] = (x == 0 || x == fieldWidth - 1 || y == fieldHeight - 1) ? 9 : 0;
     }
 
-    void initializePieces()
+    void initializePieces() 
     {
-        pieces[0].append(L"..X...X...X...X."); // Tetronimos 4x4
-        pieces[1].append(L"..X..XX...X.....");
-        pieces[2].append(L".....XX..XX.....");
-        pieces[3].append(L"..X..XX..X......");
-        pieces[4].append(L".X...XX...X.....");
-        pieces[5].append(L".X...X...XX.....");
-        pieces[6].append(L"..X...X..XX.....");
+        tetrominoes[0].append(L"..X...X...X...X."); // Tetronimos 4x4
+        tetrominoes[1].append(L"..X..XX...X.....");
+        tetrominoes[2].append(L".....XX..XX.....");
+        tetrominoes[3].append(L"..X..XX..X......");
+        tetrominoes[4].append(L".X...XX...X.....");
+        tetrominoes[5].append(L".X...X...XX.....");
+        tetrominoes[6].append(L"..X...X..XX.....");
     }
 
-    void initializeScreen()
+    void initializeScreen() 
     {
-        screen = new wchar_t[scrWidth * scrHeight];
-        for (int i = 0; i < scrWidth * scrHeight; i++)
-            screen[i] = L' ';
+        screen = new wchar_t[consoleWidth * consoleHeight];
+        for (int i = 0; i < consoleWidth * consoleHeight; i++) screen[i] = L' ';
     }
 
-    void loadHighScore()
+    void loadHighScore() 
     {
         ifstream file("highscore.txt");
-        if (file.is_open())
+        if (file.is_open()) 
         {
             file >> highScore;
             file.close();
         }
     }
 
-    void saveHighScore()
+    void saveHighScore() 
     {
-        if (score > highScore)
+        if (score > highScore) 
         {
             highScore = score;
             ofstream file("highscore.txt");
-            if (file.is_open())
+            if (file.is_open()) 
             {
                 file << highScore;
                 file.close();
@@ -140,22 +145,22 @@ private:
         }
     }
 
-    void showStartingAnimation()
+    void showStartingAnimation() 
     {
         system("clear");
         string text = "TETRIS GAME";
         string displayText = "           ";
-        for (int i = 0; i < 11; ++i)
+        for (int i = 0; i < 11; ++i) 
         {
             displayText[i] = text[i];
             system("clear");
-            for (int j = 0; j < 10; ++j)
+            for (int j = 0; j < 10; ++j) 
             {
-                if (j == 2)
+                if (j == 2) 
                 {
                     cout << displayText;
-                }
-                else
+                } 
+                else 
                 {
                     cout << "     ";
                 }
@@ -165,39 +170,31 @@ private:
         }
     }
 
-    int rotate(int px, int py, int r)
+    int rotate(int px, int py, int r) 
     {
         int pi = 0;
-        switch (r % 4)
+        switch (r % 4) 
         {
-        case 0:
-            pi = py * 4 + px;
-            break; // 0 degrees
-        case 1:
-            pi = 12 + py - (px * 4);
-            break; // 90 degrees
-        case 2:
-            pi = 15 - (py * 4) - px;
-            break; // 180 degrees
-        case 3:
-            pi = 3 - py + (px * 4);
-            break; // 270 degrees
+            case 0: pi = py * 4 + px; break; // 0 degrees
+            case 1: pi = 12 + py - (px * 4); break; // 90 degrees
+            case 2: pi = 15 - (py * 4) - px; break; // 180 degrees
+            case 3: pi = 3 - py + (px * 4); break; // 270 degrees
         }
         return pi;
     }
 
-    bool doesPieceFit(int pieceIdx, int rot, int posX, int posY)
+    bool doesPieceFit(int pieceIdx, int rot, int posX, int posY) 
     {
         for (int px = 0; px < 4; px++)
-            for (int py = 0; py < 4; py++)
+            for (int py = 0; py < 4; py++) 
             {
                 int pi = rotate(px, py, rot);
-                int fi = (posY + py) * fldWidth + (posX + px);
-                if (posX + px >= 0 && posX + px < fldWidth)
+                int fi = (posY + py) * fieldWidth + (posX + px);
+                if (posX + px >= 0 && posX + px < fieldWidth) 
                 {
-                    if (posY + py >= 0 && posY + py < fldHeight)
+                    if (posY + py >= 0 && posY + py < fieldHeight) 
                     {
-                        if (pieces[pieceIdx][pi] != L'.' && field[fi] != 0)
+                        if (tetrominoes[pieceIdx][pi] != L'.' && field[fi] != 0)
                             return false;
                     }
                 }
@@ -205,7 +202,7 @@ private:
         return true;
     }
 
-    bool kbhit()
+    bool kbhit() 
     {
         struct timeval tv = {0L, 0L};
         fd_set fds;
@@ -214,225 +211,276 @@ private:
         return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
     }
 
-    char getch()
+    char getch() 
     {
         char buf = 0;
-        if (read(STDIN_FILENO, &buf, 1) < 0)
+        if (read(STDIN_FILENO, &buf, 1) < 0) 
         {
             perror("read()");
         }
         return buf;
     }
 
-    void setTerminalRawMode(bool enable)
+    void setTerminalRawMode(bool enable) 
     {
         static struct termios oldt, newt;
-        if (enable)
+        if (enable) 
         {
             tcgetattr(STDIN_FILENO, &oldt);
             newt = oldt;
             newt.c_lflag &= static_cast<tcflag_t>(~(ICANON | ECHO));
             tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-        }
+        } 
         else
         {
             tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
         }
     }
 
-    void handleInput()
+    void handleInput() 
     {
-        if (kbhit())
+        if (kbhit()) 
         {
             char keyPressed = getch();
-            switch (keyPressed)
+            switch (keyPressed) 
             {
-            case 'd':
-                key[0] = true;
-                break; // Move right
-            case 'a':
-                key[1] = true;
-                break; // Move left
-            case 's':
-                key[2] = true;
-                break; // Move down
-            case 'w':
-                key[3] = true;
-                break; // Rotate
-            case ' ':
-                instantDrop = true;
-                break; // Instant drop
-            case 'x':
-                gameOver = true;
-                break; // Exit
-            case 'r':
-                initialize();
-                break; // Restart
-            case 'p':
-                paused = !paused;
-                break; // Pause
-            default:
-                break;
+                case 'd': keys[0] = true; break; // Move right
+                case 'a': keys[1] = true; break; // Move left
+                case 's': keys[2] = true; break; // Move down
+                case 'w': keys[3] = true; break; // Rotate
+                case 'x': isGameOver = true; break; // Exit
+                case 'r': initialize(); break; // Restart
+                case 'p': isPaused = !isPaused; break; // Pause
+                case ' ': dropPiece(); break; // Drop piece instantly
+                case 'u': undo(); break; // Undo last piece
+                default: break;
             }
         }
     }
 
-    void initialize()
+    void dropPiece() 
     {
-        curPiece = 0;
-        curRot = 0;
-        curX = fldWidth / 2;
-        curY = 0;
-        spd = 20;
-        spdCount = 0;
-        forceDown = false;
-        rotHold = true;
-        pieceCount = 0;
+        while (doesPieceFit(currentPiece, currentRotation, currentX, currentY + 1)) 
+        {
+            currentY++;
+        }
+        forcePieceDown = true;
+    }
+
+    void initialize() 
+    {
+        currentPiece = 0;
+        currentRotation = 0;
+        currentX = fieldWidth / 2;
+        currentY = 0;
+        speed = 20;
+        speedCounter = 0;
+        forcePieceDown = false;
+        rotationHold = true;
+        pieceCounter = 0;
         score = 0;
-        lines.clear();
-        gameOver = false;
-        paused = false;
+        completedLines.clear();
+        isGameOver = false;
+        isPaused = false;
         level = 1;
+        nextPiece = rand() % 7;
         initializeField();
+        delete[] previousField;
+        previousField = nullptr;
     }
 
-    void updateGame()
+    void updateGame() 
     {
-        curX += (key[0] && doesPieceFit(curPiece, curRot, curX + 1, curY)) ? 1 : 0;
-        curX -= (key[1] && doesPieceFit(curPiece, curRot, curX - 1, curY)) ? 1 : 0;
-        curY += (key[2] && doesPieceFit(curPiece, curRot, curX, curY + 1)) ? 1 : 0;
+        currentX += (keys[0] && doesPieceFit(currentPiece, currentRotation, currentX + 1, currentY)) ? 1 : 0;
+        currentX -= (keys[1] && doesPieceFit(currentPiece, currentRotation, currentX - 1, currentY)) ? 1 : 0;
+        currentY += (keys[2] && doesPieceFit(currentPiece, currentRotation, currentX, currentY + 1)) ? 1 : 0;
 
-        if (key[3])
+        if (keys[3]) 
         {
-            curRot += (rotHold && doesPieceFit(curPiece, curRot + 1, curX, curY)) ? 1 : 0;
-            rotHold = false;
-        }
+            currentRotation += (rotationHold && doesPieceFit(currentPiece, currentRotation + 1, currentX, currentY)) ? 1 : 0;
+            rotationHold = false;
+        } 
         else
-            rotHold = true;
+            rotationHold = true;
 
-        // Instant drop logic
-        if (instantDrop)
+        if (forcePieceDown) 
         {
-            while (doesPieceFit(curPiece, curRot, curX, curY + 1))
-            {
-                curY++;
-            }
-            instantDrop = false;
-            forceDown = true; // Force placing the piece
-        }
+            speedCounter = 0;
+            pieceCounter++;
+            if (pieceCounter % 50 == 0)
+                if (speed >= 10) speed--;
 
-        if (forceDown)
-        {
-            spdCount = 0;
-            pieceCount++;
-            if (pieceCount % 50 == 0)
-                if (spd >= 10)
-                    spd--;
-
-            if (mode == RANDOM)
+            if (gameMode == RANDOM) // 100% chance to change piece
             {
-                curPiece = rand() % 7;
+                currentPiece = rand() % 7;
             }
 
-            if (doesPieceFit(curPiece, curRot, curX, curY + 1))
-                curY++;
-            else
+            if (doesPieceFit(currentPiece, currentRotation, currentX, currentY + 1))
+                currentY++;
+            else 
             {
+                // Save the current state before placing the piece
+                saveState();
+
                 for (int px = 0; px < 4; px++)
                     for (int py = 0; py < 4; py++)
-                        if (pieces[curPiece][rotate(px, py, curRot)] != L'.')
-                            field[(curY + py) * fldWidth + (curX + px)] = curPiece + 1;
+                        if (tetrominoes[currentPiece][rotate(px, py, currentRotation)] != L'.')
+                            field[(currentY + py) * fieldWidth + (currentX + px)] = currentPiece + 1;
 
                 for (int py = 0; py < 4; py++)
-                    if (curY + py < fldHeight - 1)
+                    if (currentY + py < fieldHeight - 1) 
                     {
                         bool line = true;
-                        for (int px = 1; px < fldWidth - 1; px++)
-                            line &= (field[(curY + py) * fldWidth + px]) != 0;
+                        for (int px = 1; px < fieldWidth - 1; px++)
+                            line &= (field[(currentY + py) * fieldWidth + px]) != 0;
 
-                        if (line)
+                        if (line) 
                         {
-                            for (int px = 1; px < fldWidth - 1; px++)
-                                field[(curY + py) * fldWidth + px] = 8;
-                            lines.push_back(curY + py);
+                            for (int px = 1; px < fieldWidth - 1; px++)
+                                field[(currentY + py) * fieldWidth + px] = 8;
+                            completedLines.push_back(currentY + py);
                         }
                     }
 
                 score += 25;
-                if (!lines.empty())
-                    score += (1 << lines.size()) * 100;
+                if (!completedLines.empty()) 
+                score += (1 << completedLines.size()) * 100;
 
-                curX = fldWidth / 2;
-                curY = 0;
-                curRot = 0;
-                curPiece = rand() % 7;
+                currentPiece = nextPiece;
+                nextPiece = rand() % 7;
 
-                gameOver = !doesPieceFit(curPiece, curRot, curX, curY);
+                currentX = fieldWidth / 2;
+                currentY = 0;
+                currentRotation = 0;
 
-                if (score / 1000 > level - 1)
+                isGameOver = !doesPieceFit(currentPiece, currentRotation, currentX, currentY);
+
+                // Increase level and speed
+                if (score / 1000 > level - 1) 
                 {
                     level++;
-                    spd = max(10, spd - 2);
+                    speed = max(10, speed - 2);
                 }
             }
         }
     }
 
-    void drawGame()
+    void drawGame() 
     {
         system("clear");
 
-        for (int x = 0; x < fldWidth; x++)
-            for (int y = 0; y < fldHeight; y++)
-                screen[(y + 2) * scrWidth + (x + 2)] = L" ABCDEFG=#"[field[y * fldWidth + x]];
+        for (int x = 0; x < fieldWidth; x++)
+            for (int y = 0; y < fieldHeight; y++)
+                screen[(y + 2) * consoleWidth + (x + 2)] = L" ABCDEFG=#"[field[y * fieldWidth + x]];
 
         for (int px = 0; px < 4; px++)
             for (int py = 0; py < 4; py++)
-                if (pieces[curPiece][rotate(px, py, curRot)] != L'.')
-                    screen[(curY + py + 2) * scrWidth + (curX + px + 2)] = curPiece + 65;
+                if (tetrominoes[currentPiece][rotate(px, py, currentRotation)] != L'.')
+                    screen[(currentY + py + 2) * consoleWidth + (currentX + px + 2)] = currentPiece + 65;
 
-        for (int i = 0; i < scrHeight; i++)
-        {
-            for (int j = 0; j < scrWidth; j++)
+        // Draw the next piece
+        drawNextPiece();
+
+        // Display the game screen and additional information
+        for (int i = 0; i < consoleHeight; i++) {
+            for (int j = 0; j < consoleWidth; j++) 
             {
-                wcout << screen[i * scrWidth + j];
+                wcout << screen[i * consoleWidth + j];
             }
+
+            // Display instructions, live score, level, and high score next to the map
+            if (i == 2) wcout << L" Use W/A/S/D to move.";
+            if (i == 3) wcout << L" Press X to quit.";
+            if (i == 4) wcout << L" Press R to restart.";
+            if (i == 5) wcout << L" Press P to pause.";
+            if (i == 6) wcout << L" Press Space to drop.";
+            if (i == 7) wcout << L" Press U to undo.";
+            if (i == 8) wcout << L" Live Score: " << score;
+            if (i == 9) wcout << L" Level: " << level;
+            if (i == 10) wcout << L" High Score: " << highScore;
+            if (i == 11) wcout << L" 25 pts when a piece is placed,";
+            if (i == 12) wcout << L" 100 pts for each line cleared";
+
             wcout << endl;
         }
 
-        if (!lines.empty())
+        if (!completedLines.empty()) 
         {
             this_thread::sleep_for(chrono::milliseconds(400));
 
-            for (auto &v : lines)
-                for (int px = 1; px < fldWidth - 1; px++)
+            for (auto &line : completedLines)
+                for (int px = 1; px < fieldWidth - 1; px++)
                 {
-                    for (int py = v; py > 0; py--)
-                        field[py * fldWidth + px] = field[(py - 1) * fldWidth + px];
+                    for (int py = line; py > 0; py--)
+                        field[py * fieldWidth + px] = field[(py - 1) * fieldWidth + px];
                     field[px] = 0;
                 }
 
-            lines.clear();
+            completedLines.clear();
         }
+    }
 
-        // Display instructions, live score, level, and high score
-        wcout << L"Use W/A/S/D to move. Press X to quit. Press R to restart. Press P to pause." << endl;
-        wcout << L"Live Score: " << score << endl;
-        wcout << L"Level: " << level << endl;
-        wcout << L"High Score: " << highScore << endl;
-        wcout << L"25 pts when a piece is placed, 100 pts for each line cleared" << endl;
+    void drawNextPiece() 
+    {
+        int offsetX = fieldWidth + 5; // Position to the right of the field
+        int offsetY = 5; // Position below the top of the screen
+
+        // Clear the area where the next piece will be drawn
+        for (int px = 0; px < 4; px++)
+            for (int py = 0; py < 4; py++)
+                screen[(offsetY + py) * consoleWidth + (offsetX + px)] = L' ';
+
+        // Draw the next piece
+        for (int px = 0; px < 4; px++)
+            for (int py = 0; py < 4; py++)
+                if (tetrominoes[nextPiece][rotate(px, py, 0)] != L'.')
+                    screen[(offsetY + py) * consoleWidth + (offsetX + px)] = nextPiece + 65;
+    }
+
+    void saveState() 
+    {
+        delete[] previousField;
+        previousField = new unsigned char[fieldWidth * fieldHeight];
+        memcpy(previousField, field, fieldWidth * fieldHeight * sizeof(unsigned char));
+        previousPiece = currentPiece;
+        previousRotation = currentRotation;
+        previousX = currentX;
+        previousY = currentY;
+        previousScore = score;
+    }
+
+    void undo() 
+    {
+        if (previousField) 
+        {
+            // Clear the last placed piece from the field
+            for (int px = 0; px < 4; px++)
+                for (int py = 0; py < 4; py++)
+                    if (tetrominoes[previousPiece][rotate(px, py, previousRotation)] != L'.')
+                        field[(previousY + py) * fieldWidth + (previousX + px)] = 0;
+
+            // Restore the previous state
+            memcpy(field, previousField, fieldWidth * fieldHeight * sizeof(unsigned char));
+            currentPiece = previousPiece;
+            currentRotation = previousRotation;
+            currentX = fieldWidth / 2; // Reset X position to the top
+            currentY = 0; // Reset Y position to the top
+            score = previousScore;
+            delete[] previousField;
+            previousField = nullptr;
+        }
     }
 };
 
-int main()
+int main() 
 {
     int modeChoice;
     cout << "Select Game Mode: 1. Default 2. Random Pieces" << endl;
     cin >> modeChoice;
 
-    GameMode mode = (modeChoice == 2) ? RANDOM : DEFAULT;
+    GameMode gameMode = (modeChoice == 2) ? RANDOM : DEFAULT;
 
-    TetrisGame game(mode);
+    TetrisGame game(gameMode);
     game.run();
     return 0;
 }
