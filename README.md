@@ -45,7 +45,7 @@ g++ -o tetris TetrisGame.cpp -std=c++11
 
 ## 📊 Scoring
 - ✅ **1 each peice drop**: **25 points**
-- ✅ **2 line cleared**: **100 points**
+- ✅ **2 each line cleared**: **100 points**
 
 
 ## 🏆 High Score
